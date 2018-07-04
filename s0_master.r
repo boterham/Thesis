@@ -20,17 +20,14 @@ filenames <- c("Scripts/s1_functions.R",
 provinces <- data.frame(name=c("SonLa","LaiChau","DienBien","HoaBinh"),
                         lastTrain=c(9,12,13,12),
                         firstPred=c(10,13,14,13))
-# for (i in 1:nrow(provinces)){
-#   dir <- paste0(getwd(),"/Provinces/",provinces$name[i],"/")
-#   lastTrain <- provinces$lastTrain[i]
-#   firstPred <- lastTrain + 1
-#   try(sapply(filenames, source))
-# }
+for (i in 1:nrow(provinces)){
+   dir <- paste0(getwd(),"/Provinces/",provinces$name[i],"/")
+   lastTrain <- provinces$lastTrain[i]
+   firstPred <- lastTrain + 1
+   try(sapply(filenames, source))
+}
 
-dir <- paste0(getwd(),"/Provinces/LaiChau/")
-lastTrain <- 12
-firstPred <- 13
-sapply(filenames,source)
+
 
 
 prov.list <- list()
