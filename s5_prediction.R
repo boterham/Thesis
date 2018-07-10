@@ -37,8 +37,11 @@ plot(pred,main=predmain)
 
 # Other years after PFES
 for (i in (firstPred+1):lastPred){
-  # print(paste("Year:",i+2000))
+  directory.year <- paste0(dir,"annualFolders/variables_",i)
+  fileList <- list.files(path=directory.year,pattern=glob2rx("*.tif"))
+  print(paste("Year:",i+2000))
   names(pred) <- "deforestation"
+  print
   s <- loadYearPred(i,dir)
   fc <- pred
   fc[fc == 1] <- NA
