@@ -2,9 +2,8 @@ print(paste("Validation of",dir,"started at",Sys.time()))
 
 set.seed(1)
 evolve.dir <- paste0(dir,"evolution/")
-query <- paste0("pop_all_*")
-pop.all <- list.files(path=evolve.dir,pattern=glob2rx(as.character(query))) %>% max
-load(paste0(evolve.dir,pop.all))
+pop.all <- paste0(evolve.dir,"pop_all_",iterations,".Rda")
+load(pop.all)
 
 trainPath <- paste0(dir,"finalValidation/train.Rdata")
 validPath <- paste0(dir,"finalValidation/valid.Rdata")
@@ -42,5 +41,8 @@ pred.info <- paste("Pred acc:",round(a,digits = 2),"k:",round(k,digits=2),"pr:",
 par(mfrow=c(1,2))
 plot(real,main="Real")
 plot(pred,main=pred.info)
+validation.df <- data.frame(tn=t[1,1],tp=t[2,2],fp=t[2,1],fn=t[1,2],k,a,pr)
+valid.df.path <- paste0(dir,"finalValidation/results.RDa")
+save(validation.df,file = valid.df.path)
 
 print(paste("Validation completed at",Sys.time()))
