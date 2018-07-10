@@ -6,15 +6,17 @@ require(raster)
 require(plotrix)
 require(reshape2)
 require(randomForest)
+require(doMC)
 require(foreach)
 require(parallel)
 require(ggplot2) 
 require(rasterVis)
 require(rgdal)
 
+
 # Other settings
 options(digits = 4)
-memory.limit()
+try(memory.limit())
 detectCores()
 registerDoSEQ()
 try(registerDoMC(cores))
@@ -132,6 +134,7 @@ load.fold <- function(fold,dir){
   return(list(train.fold,valid.fold))
 }
 rf.fold <- function(x,fold,seed,dir,verbose=F){
+  # print(paste("rf.fold",fold,"ntree",x$ntree,"mtry",x$mtry,"sampsize",x$sampsize))
   # print(paste("rf.fold",fold))
   fold.l <- load.fold(fold,dir)
   # print("1")
@@ -154,7 +157,7 @@ rf.fold <- function(x,fold,seed,dir,verbose=F){
   #  input[[2]] <- 500*(50/100=0.5)=250
   
   # 
-  # print(sampsize.input)
+  # print(paste("sampsize.input:",sampsize.input))
   predictions <- rep(0,times=nrow(valid))
   # print("9")
   set.seed(seed)
@@ -173,12 +176,15 @@ rf.fold <- function(x,fold,seed,dir,verbose=F){
   try(predictions <- predict(model,newdata=valid))
   # print("12")
   confusion <- squareTable(predictions,valid$deforestation)
+  print(paste(confusion[1,1],confusion[1,2],confusion[2,1],confusion[2,2]))
   # print("13")
   TN <- confusion[1,1]
   FP <- confusion[1,2]
   FN <- confusion[2,1]
   TP <- confusion[2,2]
   TPR <- TP/(TP+FN)
+  if(is.nan(TPR)){TPR <- 0
+  print("TPR is NaN")}
   FPR <- FP/(TN+FP)
   ACC <- (TP+TN)/(TP+TN+FP+FN)
   k <- kappa(TN,FP,FN,TP)
@@ -195,19 +201,16 @@ rf.validate <- function(x,seeds,dir,folds=1:10,verbose=F){
     foreach(seed.cv = seeds) %dopar% rf.fold(x,fold.cv,seed.cv,dir)
 }
 rf.cv <- function(x,seeds,dir,folds=1:10,verbose=F){
-  print("rf.cv")
+  # print("rf.cv")
   # print(x)
   results <- unlist(rf.validate(x,seeds,dir,folds,verbose),recursive = F)
   results <- do.call("rbind", results)
   # print(results)
-  # print("   complete")
+  # print("rf.cv complete")
   return(results)
 }
-
-
-
 rf.calc <- function(x,seeds,dir,folds=1:10,verbose=F){
-  print(x)
+  # print(x)
   for (i in 1:nrow(x)){
     # print(x[i,])
     cv <- rf.cv(x[i,],seeds,dir,folds,verbose)
@@ -216,9 +219,10 @@ rf.calc <- function(x,seeds,dir,folds=1:10,verbose=F){
     x$fpr[i] <- mean(cv$FPR)
     x$acc[i] <- mean(cv$ACC)
     x$pr[i] <- mean(cv$PR)
-    x$score[i] <- cost(x$k[i],x$pr[i])
-    print(x[i,])
-    # print(paste(i,"ntree:",x$ntree[i],"mtry:",x$mtry[i],"nodesize:",x$nodesize[i],"sampsize",x$sampsize[i],"cutoff",x$cutoff[i],"kappa:",round(mean(cv$k),digits=4),"accuracy:",round(mean(cv$ACC),digits=4),"tpr:",round(mean(cv$TPR),digits=4),"fpr:",round(mean(cv$FPR),digits=4),"pr:",round(mean(cv$PR),digits=4)))
+    # print(x[i,])
+    x$score[i] <- score(x$k[i],x$pr[i])
+    # print(x[i,])
+    print(paste(i,"ntree:",x$ntree[i],"mtry:",x$mtry[i],"nodesize:",x$nodesize[i],"sampsize",x$sampsize[i],"cutoff",x$cutoff[i],"kappa:",round(mean(cv$k),digits=4),"accuracy:",round(mean(cv$ACC),digits=4),"tpr:",round(mean(cv$TPR),digits=4),"fpr:",round(mean(cv$FPR),digits=4),"pr:",round(mean(cv$PR),digits=4),"score:",round(x$score[i],digits=4)))
   }
   # print(x)
   gc()
@@ -253,8 +257,6 @@ spawn <- function(amount,max.ntree=10,min.ntree=1,verbose=F){
   combinations$iteration <- 0
   return(combinations)
 }
-
-
 select <- function(pop,best=0.4,lucky=0.1,verbose=F){
   pop.size <- nrow(pop)
   # pop <- pop[order(pop$k,decreasing = TRUE ),]
@@ -339,6 +341,9 @@ evo.plot <- function(pop.all,pop,record,dir){
   points(pop$iteration,pop$score,col="black")
   points(record$iteration,record$score.mean,col="red")
   dev.off()
+  plot(pop.all$iteration,pop.all$score,col="gray")
+  points(pop$iteration,pop$score,col="black")
+  points(record$iteration,record$score.mean,col="red")
 }
 record.update <- function(pop,record=NA){
   if(is.na(record)){record <- data.frame(iteration=0,score.mean=mean(pop$score),score.max=max(pop$score),k.mean=mean(pop$k),k.max=max(pop$k),acc.mean=mean(pop$acc),acc.max=max(pop$acc),pr.mean=mean(pop$pr))}else{
@@ -365,6 +370,7 @@ saveDeforestation <- function(real,prediction,year,dir){
 loadYearPred <- function(year,dir){
   directory.year <- paste0(dir,"annualFolders/variables_",year)
   fileList <- list.files(path=directory.year,pattern=glob2rx("*.tif"))
+  print(fileList)
   rasterList <- list()
   ex <- data.frame(n=1:length(fileList),xmin=NA,xmax=NA,ymin=NA,ymax=NA)
   for (i in 1:length(fileList)){
@@ -415,11 +421,12 @@ kappa <- function(TN,FP,FN,TP){
   kappa <- (real.S-random.S)/(max.S-random.S)
   return(kappa)
 }
-
-cost <- function(k,pr){
-  if(pr > 1){pr2 <- k/pr}
-  if(pr <= 1){pr2 <- k*pr}
-  return(pr2)
+score <- function(k,pr){
+  if(pr > 1){s <- k/pr}
+  if(pr <= 1){s <- k*pr}
+  return(s)
 }
+
+test <- score(-0.001019,10.86)
 
 print(paste("Initialization completed at",Sys.time()))
