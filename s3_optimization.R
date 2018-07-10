@@ -13,12 +13,12 @@ save(pop.all,file = pop.all.dir)
 pop.i.dir <- paste0(evolve.dir,"pop_0.Rda")
 save(pop,file = pop.i.dir)
 
-(t.pop <- pop.all[3,])
-(t.rf.cv <- rf.cv(t.pop,seeds = 1,dir,folds=1:10))
-
+# (t.pop <- pop.all[3,])
+# (t.rf.cv <- rf.cv(t.pop,seeds = 1,dir,folds=1:10))
 # 3.2 Evolve the population X generations (X = [iterations])
 for (i in 1:iterations){
-  print(paste("Evolving: iteration",i))
+  start <- Sys.time()
+  print(paste("Evolving: iteration",i,start))
   # load data from previous iteration
   record.dir <- paste0(evolve.dir,"record.Rda",sep="")
   load(record.dir)
@@ -44,6 +44,9 @@ for (i in 1:iterations){
   save(pop,file=pop.i.dir)
   save(pop.all,file = pop.all.dir)
   save(record,file = record.dir)
+  end <- Sys.time()
+  print("Completed")
+  print(end-start)
   gc()
 }
 rm(fold.dir,evolve.dir,pop.all,pop,record,record.dir,pop.all.dir,pop.i.dir,i,iter)
